@@ -1,7 +1,7 @@
 package net.trochee.cryptic
 
-import net.trochee.cryptic._
-import collection.immutable.HashSet
+//import net.trochee.cryptic._
+//import collection.immutable.HashSet
 //import HashSet
 object tester1 {
   println("Welcome to the Scala worksheet")       //> Welcome to the Scala worksheet
@@ -27,5 +27,10 @@ object tester1 {
   val constrained2 = cands.constrain(constraints:_*)
                                                   //> constrained2  : net.trochee.cryptic.SolutionSet = SolutionSet(WRENCH)
 
+	val anagramConstraint = Anagram("hen cwr")//> anagramConstraint  : net.trochee.cryptic.Anagram = Anagram(Vector(C, E, H, N
+                                                  //| , R, W))
+	
+	val f = anagramConstraint.constraint("WRENCH")
+                                                  //> f  : Boolean = true
   //TODO: varargs Constraint  for cands.constrain
 }
