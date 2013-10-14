@@ -36,3 +36,13 @@ object Anagram {
   def apply (in:Clue) = new Anagram(in)
   def norm(chars:Solution):Seq[Char] =  (for (c <- chars; if c.isLetter) yield c.toUpper).sorted
 }
+
+class Hidden(c:Clue) extends Constraint {
+  val normalized = Hidden.norm(c)
+  override def toString() = "Hidden(" + normalized + ")"
+  val constraint = (s:Solution) => normalized.containsSlice(Hidden.norm(s))
+}
+object Hidden {
+  def apply(in: Clue) = new Hidden(in)
+  def norm(chars:Solution):Seq[Char] = (for (c<- chars; if c.isLetter) yield c.toUpper)
+}

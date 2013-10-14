@@ -32,5 +32,8 @@ object tester1 {
 	
 	val f = anagramConstraint.constraint("WRENCH")
                                                   //> f  : Boolean = true
-  //TODO: varargs Constraint  for cands.constrain
+  val g = Hidden("Fop era telly")                 //> g  : net.trochee.cryptic.Hidden = Hidden(Vector(F, O, P, E, R, A, T, E, L, L
+                                                  //| , Y))
+  val h = g.constraint("OPERATE")                 //> h  : Boolean = true
+    
 }

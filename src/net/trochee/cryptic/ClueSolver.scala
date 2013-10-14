@@ -7,3 +7,7 @@ abstract class ClueSolver(val clue:Clue) {
 class AnagramSolver (override val clue: Clue) extends ClueSolver(clue) {
 	val constraint = Anagram(clue)
 }
+
+class HiddenSolver (override val clue: Clue) extends ClueSolver(clue) {
+  val constraint = Hidden(clue)
+}
