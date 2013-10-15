@@ -27,13 +27,25 @@ object tester1 {
   val constrained2 = cands.constrain(constraints:_*)
                                                   //> constrained2  : net.trochee.cryptic.SolutionSet = SolutionSet(WRENCH)
 
-	val anagramConstraint = Anagram("hen cwr")//> anagramConstraint  : net.trochee.cryptic.Anagram = Anagram(Vector(C, E, H, N
-                                                  //| , R, W))
+	val anagramConstraint = Anagram("hen cwr")//> anagramConstraint  : net.trochee.cryptic.Anagram = Anagram(CEHNRW)
 	
 	val f = anagramConstraint.constraint("WRENCH")
                                                   //> f  : Boolean = true
-  val g = Hidden("Fop era telly")                 //> g  : net.trochee.cryptic.Hidden = Hidden(Vector(F, O, P, E, R, A, T, E, L, L
-                                                  //| , Y))
-  val h = g.constraint("OPERATE")                 //> h  : Boolean = true
+  val g = Hidden("Fop era telly")                 //> g  : net.trochee.cryptic.Hidden = Hidden(FOPERATELLY)
+                                                  
+  val h = Anagram("E.T. opera")                   //> h  : net.trochee.cryptic.Anagram = Anagram(AEEOPRT)
+  assert(g.constraint("OPERATE"))
+  assert(h.constraint("OPERATE"))
+  
+  val solutions = SolutionSet.fromSolutions("OPERATE", "SKEEBALL", "APPLE", "FROYO")
+                                                  //> solutions  : net.trochee.cryptic.SolutionSet = SolutionSet(OPERATE, SKEEBAL
+                                                  //| L, APPLE, FROYO)
+  println(solutions.constrain(g,h))               //> SolutionSet(OPERATE)
+  val i = Composed(Hidden("Fop era telly"), Anagram("E.T. opera"))
+                                                  //> i  : net.trochee.cryptic.Composed = Composed[Hidden(FOPERATELLY),Anagram(AE
+                                                  //| EOPRT)]
+  solutions.constrain(i)                          //> res1: net.trochee.cryptic.SolutionSet = SolutionSet(OPERATE)
+  
+ 
     
 }

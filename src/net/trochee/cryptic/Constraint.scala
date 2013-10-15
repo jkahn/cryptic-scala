@@ -10,6 +10,14 @@ object Constraint {
 //    constraints.foldLeft(ss)((cs, c) => c.constrain(cs))
 }
 
+class Composed(val left:Constraint, val right:Constraint)  extends Constraint{
+  override def toString() = "Composed[" + left + "," + right + "]"
+  val constraint = (s:Solution) => left.constraint(s) && right.constraint(s) 
+}
+object Composed {
+  def apply(left:Constraint, right:Constraint) = new Composed(left, right)
+}
+
 class HasLength(val len:Integer) extends Constraint {
     val constraint:(Solution => Boolean) = (_.length == len)
     override def toString() = "HasLength(" + len + ")"
@@ -29,7 +37,7 @@ object CharAtPos {
 class Anagram (val in:Clue) extends Constraint {
   //val normalized = in.map(_.toUpper).sorted
   val normalized = Anagram.norm(in)
-  override def toString() = "Anagram(" + normalized + ")"
+  override def toString() = "Anagram(" + String.valueOf(normalized.toArray) + ")"
   val constraint:(Solution => Boolean) = (s => (Anagram.norm(s) == normalized))
 }
 object Anagram {
@@ -38,11 +46,10 @@ object Anagram {
 }
 
 class Hidden(c:Clue) extends Constraint {
-  val normalized = Hidden.norm(c)
-  override def toString() = "Hidden(" + normalized + ")"
-  val constraint = (s:Solution) => normalized.containsSlice(Hidden.norm(s))
+  val normalized = clean(c)
+  override def toString() = "Hidden(" + String.valueOf(normalized.toArray) + ")"
+  val constraint = (s:Solution) => normalized.containsSlice(clean(s).toSeq)
 }
 object Hidden {
   def apply(in: Clue) = new Hidden(in)
-  def norm(chars:Solution):Seq[Char] = (for (c<- chars; if c.isLetter) yield c.toUpper)
 }
