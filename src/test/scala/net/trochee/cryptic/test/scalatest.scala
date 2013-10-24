@@ -27,7 +27,9 @@ clear and concise. Here's an example:
 */
 import scala.collection.mutable.Stack
 import org.scalatest.Assertions
+import org.scalatest.junit.JUnitRunner
 import org.junit.Test
+//import org.junit.runners.
 
 /*
 Here's an example of a FunSuite with ShouldMatchers mixed in:
