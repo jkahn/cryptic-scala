@@ -5,5 +5,5 @@ package object parse {
   type Position = Int
   type Label = String
   type Probability = Double
-  type SpanQueue = Stream[LabeledSpan]
+  type AnalysisQueue = Stream[LabeledSpan]
 }

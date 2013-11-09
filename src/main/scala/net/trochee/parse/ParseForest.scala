@@ -11,27 +11,29 @@ abstract trait LabeledSpan extends Weighted {
   def label: Label
 }
 
-case class Terminal(val label: Label, val prob: Probability, val tok: Token) extends LabeledSpan {
-  // prob = if (label == "W") 0.9 else 1.0
-  lazy val likelihood = prob
-  override def toString: String = tok + likelihoodString
-}
-case class TerminalType(val label: Label, val prob: Probability, val tokenfilter: (Token => Boolean))
-  extends PartialFunction[Token, Terminal] with Weighted {
-  def isDefinedAt(t: Token) = tokenfilter(t)
-  def apply(t: Token) = Terminal(label, prob, t)
-}
 
 case class NTToken(val label: Label, val prob: Probability, val spans: Seq[LabeledSpan]) extends LabeledSpan {
   override def toString(): String = label + "(" + spans + ") " + likelihoodString
   lazy val likelihood = prob * spans.map(_.prob).foldLeft(prob)(_ * _)
 }
 
-case class NonTerminalType(val label: Label, val prob: Probability, val spans: Seq[Label])
-  extends PartialFunction[Seq[LabeledSpan], NTToken] with Weighted {
-  def isDefinedAt(s: Seq[LabeledSpan]) = s.map(_.label) == spans
-  def apply(s: Seq[LabeledSpan]): NTToken = NTToken(label, prob, s)
+case class NonTerminalType(label: Label, prob: Probability, spans: Seq[Label])
+  extends  PartialFunction[Seq[LabeledSpan], NTToken] with Weighted {
+  def isDefinedAt(x: Seq[LabeledSpan]): Boolean = x.map(_.label) == spans
+  def apply(x: Seq[LabeledSpan]): NTToken = NTToken(label, prob, x)
+  }
+
+case class Terminal(val label: Label, val prob: Probability, val tok: Token) extends LabeledSpan {
+  // prob = if (label == "W") 0.9 else 1.0
+  lazy val likelihood = prob
+  override def toString: String = tok + likelihoodString
 }
+case class TerminalType(val label: Label, val prob: Probability, val tokenfilter: (Token => Boolean))
+  extends PartialFunction[Token,Terminal] with Weighted {
+  def isDefinedAt(t: Token):Boolean = tokenfilter(t)
+  def apply(t: Token):Terminal = Terminal(label, prob, t)
+  }
+
 
 class ParseForest(val tokens: Seq[Token]) {
   val terminals =
@@ -48,11 +50,36 @@ class ParseForest(val tokens: Seq[Token]) {
       NonTerminalType("OTHER", 0.8, Seq("W", "W")),
       NonTerminalType("OTHER", 0.7, Seq("W", "OTHER")))
 
+  
+  case class Move(val analysis:LabeledSpan, val state:SpanFrontier) {
+    val prob = analysis.prob
+  }
+  /**
+   * current set of priority queues covering a given region
+   */
+  case class SpanFrontier(val aQueues: Seq[AnalysisQueue]) {
+    lazy val analyses: AnalysisQueue = ParseForest.merge(Seq(nonterminalAnalyses) ++ nextAnalyses.map(_.analyses))
+    val topAnalysis:Seq[LabeledSpan] = aQueues.map(_.head)
+    
+    //TODO: rewrite below as collect?
+    lazy val nonterminalAnalyses: AnalysisQueue =
+      (for { nt <- nonterminals; if nt.isDefinedAt(topAnalysis) }
+        yield nt(topAnalysis)).toStream
+
+    lazy val nextAnalyses: Seq[SpanFrontier] =
+      for { aqIdx <- aQueues.indices;
+        	keyQ = aQueues(aqIdx).tail;
+        	if keyQ.tail != Stream.Empty;
+        	prefix = aQueues.take(aqIdx)
+        	suffix = aQueues.takeRight(aQueues.length - aqIdx - 1)
+      } yield SpanFrontier(prefix ++ Seq(keyQ.tail) ++ suffix) 
+  }
+
   /** returns probability-descending parses using spans given */
-  def parsesAt(split: Position): SpanQueue = {
+  def parsesAt(split: Position): AnalysisQueue = {
     val (l, r) = tokens.splitAt(split)
 
-    val parses: SpanQueue = for {
+    val parses: AnalysisQueue = for {
       lParse <- ParseForest(l).spans;
       rParse <- ParseForest(r).spans;
       nt <- nonterminals;
@@ -65,10 +92,11 @@ class ParseForest(val tokens: Seq[Token]) {
   // combinatorial exploration, best-first
 
 
+  //TODO rewrite spans to propose all spans bottom-up?
   /**
    *  the spans possible for this token-sequence
    */
-  lazy val spans: SpanQueue =
+  lazy val spans: AnalysisQueue =
     tokens match {
       case Nil => Stream.Empty
       case Seq(t: Token) => (for { term <- terminals; if term.isDefinedAt(t) } yield term(t)).toStream
@@ -81,7 +109,7 @@ object ParseForest {
 
   //TODO: rewrite to use partially-sorted substreams
 
-  def merge(input: Seq[SpanQueue]): SpanQueue =
+  def merge(input: Seq[AnalysisQueue]): AnalysisQueue =
     input.filterNot(_.isEmpty).sortBy(-_.head.prob) match {
       case Nil => Stream.Empty
       case head :: Nil => head // only one stream remaining, use it directly
