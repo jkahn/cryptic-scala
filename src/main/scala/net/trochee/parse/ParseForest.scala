@@ -35,12 +35,11 @@ case class ParseForest(val aQueues: Seq[AnalysisQueue]) {
 
   val nonterminals =
     Seq(
-      NonTerminalType("Anagram", 0.98, Seq("ANAGRAM", "OTHER")),
-      NonTerminalType("Anagram", 0.97, Seq("OTHER", "ANAGRAM")),
-      NonTerminalType("Hidden", 0.96, Seq("HIDDEN", "OTHER")),
-      NonTerminalType("Hidden", 0.95, Seq("OTHER", "HIDDEN")),
-      NonTerminalType("OTHER", 0.8, Seq("W", "W")),
-      NonTerminalType("OTHER", 0.7, Seq("W", "OTHER")))
+      NonTerminalType('Anagram, 0.98, Seq('AnagramHint, 'Content)),
+      NonTerminalType('Anagram, 0.97, Seq('Content, 'AnagramHint)),
+      NonTerminalType('Hidden, 0.96, Seq('HiddenHint, 'Content)),
+      NonTerminalType('Hidden, 0.95, Seq('Content, 'HiddenHint)),
+      NonTerminalType('Content, 0.8, Seq('Content, 'Content)))
 
   /**
    * spanningAnalyses are all those single nonterminals that cover this entire region
@@ -73,9 +72,9 @@ case class ParseForest(val aQueues: Seq[AnalysisQueue]) {
 }
 object ParseForest {
   val terminals =
-    Seq(TerminalType("HIDDEN", 0.98, (_.toLowerCase() == "hides")),
-      TerminalType("ANAGRAM", 0.97, (_.toLowerCase() == "scrambles")),
-      TerminalType("W", 0.4, (x => true)))
+    Seq(TerminalType('HiddenHint, 0.98, (_.toLowerCase() == "hides")),
+      TerminalType('AnagramHint, 0.97, (_.toLowerCase() == "scrambles")),
+      TerminalType('Content, 0.4, (x => true)))
 
   //TODO rewrite as collect call?
   def tokenstream(tok:Token): AnalysisQueue =
