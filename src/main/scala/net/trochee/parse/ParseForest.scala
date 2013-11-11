@@ -1,7 +1,5 @@
 package net.trochee.parse
 
-import scala.annotation.tailrec
-
 abstract trait Weighted {
   def prob: Probability
   def likelihoodString: String = "[" + prob + "]"
@@ -10,7 +8,6 @@ abstract trait Weighted {
 abstract trait LabeledSpan extends Weighted {
   def label: Label
 }
-
 
 case class NTToken(val label: Label, val prob: Probability, val spans: Seq[LabeledSpan]) extends LabeledSpan {
   override def toString(): String = label + "(" + spans + ") " + likelihoodString
@@ -24,7 +21,6 @@ case class NonTerminalType(label: Label, prob: Probability, spans: Seq[Label])
   }
 
 case class Terminal(val label: Label, val prob: Probability, val tok: Token) extends LabeledSpan {
-  // prob = if (label == "W") 0.9 else 1.0
   lazy val likelihood = prob
   override def toString: String = tok + likelihoodString
 }
@@ -35,11 +31,7 @@ case class TerminalType(val label: Label, val prob: Probability, val tokenfilter
   }
 
 
-class ParseForest(val tokens: Seq[Token]) {
-  val terminals =
-    Seq(TerminalType("HIDDEN", 0.98, (_.toLowerCase() == "hides")),
-      TerminalType("ANAGRAM", 0.97, (_.toLowerCase() == "scrambles")),
-      TerminalType("W", 0.4, (x => true)))
+case class ParseForest(val aQueues: Seq[AnalysisQueue]) {
 
   val nonterminals =
     Seq(
@@ -50,80 +42,56 @@ class ParseForest(val tokens: Seq[Token]) {
       NonTerminalType("OTHER", 0.8, Seq("W", "W")),
       NonTerminalType("OTHER", 0.7, Seq("W", "OTHER")))
 
+  /**
+   * spanningAnalyses are all those single nonterminals that cover this entire region
+   */
+  lazy val spanningAnalyses: AnalysisQueue = 
+    ParseForest.zipQueues(Seq(spanningNTAnalyses) ++ nextAnalyses.map(_.spanningAnalyses))
+
+  val topAnalysis:Seq[LabeledSpan] = aQueues.map(_.head)
+
+  /** 
+   *  nonTerminalAnalyses - a queue of NT spans that allow an NT over the entire topAnalysis
+   */
+  lazy val spanningNTAnalyses: AnalysisQueue =
+      (for { nt <- nonterminals.toStream; if nt.isDefinedAt(topAnalysis) }
+        yield nt(topAnalysis))
   
-  case class Move(val analysis:LabeledSpan, val state:SpanFrontier) {
-    val prob = analysis.prob
-  }
-  /**
-   * current set of priority queues covering a given region
+  /** 
+   *  all adjacent parse forests without applying any nonterminal rules
+   *  
+   *  choose the next one for each analysis bucket.
    */
-  case class SpanFrontier(val aQueues: Seq[AnalysisQueue]) {
-    lazy val analyses: AnalysisQueue = ParseForest.merge(Seq(nonterminalAnalyses) ++ nextAnalyses.map(_.analyses))
-    val topAnalysis:Seq[LabeledSpan] = aQueues.map(_.head)
-    
-    //TODO: rewrite below as collect?
-    lazy val nonterminalAnalyses: AnalysisQueue =
-      (for { nt <- nonterminals; if nt.isDefinedAt(topAnalysis) }
-        yield nt(topAnalysis)).toStream
-
-    lazy val nextAnalyses: Seq[SpanFrontier] =
-      for { aqIdx <- aQueues.indices;
-        	keyQ = aQueues(aqIdx).tail;
-        	if keyQ.tail != Stream.Empty;
-        	prefix = aQueues.take(aqIdx)
-        	suffix = aQueues.takeRight(aQueues.length - aqIdx - 1)
-      } yield SpanFrontier(prefix ++ Seq(keyQ.tail) ++ suffix) 
-  }
-
-  /** returns probability-descending parses using spans given */
-  def parsesAt(split: Position): AnalysisQueue = {
-    val (l, r) = tokens.splitAt(split)
-
-    val parses: AnalysisQueue = for {
-      lParse <- ParseForest(l).spans;
-      rParse <- ParseForest(r).spans;
-      nt <- nonterminals;
-      if (nt.isDefinedAt(Seq(lParse, rParse)))
-    } yield nt(Seq(lParse, rParse))
-    parses.sortBy(-_.prob)
-    // TODO: think about how to return stream of highest-quality first without having to look at all available
-  }
-
-  // combinatorial exploration, best-first
-
-
-  //TODO rewrite spans to propose all spans bottom-up?
-  /**
-   *  the spans possible for this token-sequence
-   */
-  lazy val spans: AnalysisQueue =
-    tokens match {
-      case Nil => Stream.Empty
-      case Seq(t: Token) => (for { term <- terminals; if term.isDefinedAt(t) } yield term(t)).toStream
-      case _ => ParseForest.merge(for {splitPn <- 0 to tokens.length} yield parsesAt(splitPn))
-    }
+  lazy val nextAnalyses: Seq[ParseForest] =
+    for { aqIdx <- aQueues.indices;
+    	  keyQ = aQueues(aqIdx);
+    	  if keyQ.tail != Stream.Empty;
+    	  prefix = aQueues.take(aqIdx)
+    	  suffix = aQueues.takeRight(aQueues.length - aqIdx -1)
+    } yield ParseForest(prefix ++ Seq(keyQ.tail) ++ suffix)
 
 }
 object ParseForest {
-  def apply(toks: Seq[String]) = new ParseForest(toks)
+  val terminals =
+    Seq(TerminalType("HIDDEN", 0.98, (_.toLowerCase() == "hides")),
+      TerminalType("ANAGRAM", 0.97, (_.toLowerCase() == "scrambles")),
+      TerminalType("W", 0.4, (x => true)))
 
-  //TODO: rewrite to use partially-sorted substreams
-
-  def merge(input: Seq[AnalysisQueue]): AnalysisQueue =
-    input.filterNot(_.isEmpty).sortBy(-_.head.prob) match {
-      case Nil => Stream.Empty
-      case head :: Nil => head // only one stream remaining, use it directly
-      case topQ :: tail // return the first item from the first list, then re-sort
-      => topQ.head #:: merge(topQ.tail :: tail)
-    }
-}
+  //TODO rewrite as collect call?
+  def tokenstream(tok:Token): AnalysisQueue =
+    (for {t <- terminals.toStream if t.isDefinedAt(tok)} yield t(tok))
  
-/*
- * parse forest stream algorithm
- * 
- * assume best-first immutable stream for each span
- *
- * compose whole span + subspans+composition
- * 
- * return as stream, best-first 
- */
+  def fromTokens(toks: Seq[String]) = ParseForest(toks.map(tokenstream))
+
+  /**
+   * given an input sequence of priority queues, lazily report the next best 
+   * one, heap-style
+   */
+  def zipQueues(input: Seq[AnalysisQueue]): AnalysisQueue = {
+    val active = input.filterNot(_.isEmpty)
+    val maxIdx = active.indices.maxBy(active(_).head.prob)
+    val nextQueue = active.updated(maxIdx, active(maxIdx).tail)
+    active(maxIdx).head #:: zipQueues(nextQueue)
+  }
+
+}
