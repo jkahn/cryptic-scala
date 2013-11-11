@@ -88,9 +88,12 @@ object ParseForest {
    */
   def zipQueues(input: Seq[AnalysisQueue]): AnalysisQueue = {
     val active = input.filterNot(_.isEmpty)
-    val maxIdx = active.indices.maxBy(active(_).head.prob)
-    val nextQueue = active.updated(maxIdx, active(maxIdx).tail)
-    active(maxIdx).head #:: zipQueues(nextQueue)
+    if (active.isEmpty) Stream.Empty
+    else {
+      val maxIdx = active.indices.maxBy(active(_).head.prob)
+      val nextQueue = active.updated(maxIdx, active(maxIdx).tail)
+      active(maxIdx).head #:: zipQueues(nextQueue)
+    }
   }
 
 }
