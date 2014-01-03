@@ -1,0 +1,11 @@
+net.trochee.cryptic
+
+Tools for cryptic-crossword constraint-based word-puzzle solving.
+
+Copyright Jeremy G. Kahn 2013-2014.
+
+email: jeremy@trochee.net
+
+Please get in touch if you would like to use this under a different
+license. I am open to open-source licensing but have not worked out
+what the best license would be for this collection of tools.
